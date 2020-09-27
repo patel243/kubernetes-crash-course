@@ -250,6 +250,43 @@ You will be using containerizing (using Docker) and deploying a variety of proje
 - 11 Step 08 - Playing with Docker Containers
 - 11 Step 09 - Playing with Docker Commands - stats, system
 
+### Kubernetes on AWS with EKS
+- 12 Step 01 - Kubernetes on AWS with EKS - Section Introduction
+- 12 Step 02 - Creating an AWS Root Account
+- 12 Step 03 - Creating an IAM User for your AWS Account
+- 12 Step 04 - Its Your Responsibility to Monitor Billing on the Cloud - 5 Recommendations
+- 12 Step 05 - Monitor AWS Billing - Setting Billing Alerts
+- 12 Step 06 - Installing AWS CLI
+- 12 Step 07 - Install EKS CTL and Configure AWS CLI with IAM User
+- 12 Step 08 - Create a Kubernetes Cluster on AWS with EKS
+- 12 Step 09 - Quick Review of AWS Basics - Region, AZ, VPC and Subnet
+- 12 Step 10 - Quick Review of the AWS EKS Kubernetes Cluster
+- 12 Step 11 - Review Hello World and Web Apps from GKE Section
+- 12 Step 12 - Deploy Hello World Rest Api to AWS EKS Kubernetes Cluster
+- 12 Step 13 - Deploy Web App H2 to AWS EKS Kubernetes Cluster
+- 12 Step 14 - Deploy Web App with MySQL to AWS EKS Kubernetes Cluster
+- 12 Step 15 - Delete Web App and Hello World Deployments
+- 12 Step 16 - Review of Microservices on GKE
+- 12 Step 17 - Deploy Microservices to AWS EKS Kubernetes Cluster
+- 12 Step 18 - Setup Ingress Controller and Ingress
+- 12 Step 19 - Quick Review of Ingress
+- 12 Step 20 - Setup Container Insights and AWS Cloud Watch Logs
+- 12 Step 21 - Setup Cluster Autoscaling on AWS EKS Kubernetes Cluster
+- 12 Step 22 - Delete AWS EKS Kubernetes Cluster
+
+### Kubernetes on Azure with AKS
+- 13 Step 01 - Kubernetes on Azure with AKS - Section Introduction
+- 13 Step 02 - Creating an Azure Account
+- 13 Step 03 - Create a Resource Group, Service Principal and AKS Kubernetes Cluster
+- 13 Step 04 - Deploy Hello World Rest Api to Azure AKS Kubernetes Cluster
+- 13 Step 05 - Deploy Web App H2 to Azure AKS Kubernetes Cluster
+- 13 Step 06 - Deploy Web App with MySQL to Azure AKS Kubernetes Cluster
+- 13 Step 07 - Delete Deployments and Review of Microservices on GKE
+- 13 Step 08 - Deploy Microservices to Azure AKS Kubernetes Cluster
+- 13 Step 09 - Review Dev Spaces, Insights and Logs in Azure AKS Kubernetes Cluster
+- 13 Step 10 - Setup Ingress Controller and Ingress
+- 13 Step 11 - Review Cluster Autoscaling on Azure AKS Kubernetes Cluster
+- 13 Step 12 - Delete Azure AKS Kubernetes Cluster
 
 ```sh
 for file in *; do mv "${file}" "${file//-/ }"; done
@@ -527,6 +564,92 @@ helm upgrade currency-services-1 ./currency-conversion/
 helm history currency-services-1
 
 ```
+
+## AWS
+
+```
+eksctl create cluster --name in28minutes-cluster --nodegroup-name in28minutes-cluster-node-group  --node-type t2.medium --nodes 3 --nodes-min 3 --nodes-max 7 --managed --asg-access
+kubectl create deployment hello-world-rest-api --image=in28min/hello-world-rest-api:0.0.1.RELEASE
+kubectl expose deployment hello-world-rest-api --type=LoadBalancer --port=8080
+kubectl create deployment todowebapp-h2 --image=in28min/todo-web-application-h2:0.0.1-SNAPSHOT
+kubectl expose deployment todowebapp-h2 --type=LoadBalancer --port=8080
+cd 03-todo-web-application-mysql/backup/02-final-backup-at-end-of-course 
+kubectl apply -f mysql-database-data-volume-persistentvolumeclaim-aws.yaml,mysql-deployment.yaml,mysql-service.yaml
+kubectl apply -f config-map.yaml,secret.yaml,todo-web-application-deployment.yaml,todo-web-application-service.yaml
+echo -n dummytodos | base64
+kubectl delete all -l app=hello-world-rest-api
+kubectl delete all -l app=todowebapp-h2
+kubectl delete all -l io.kompose.service=todo-web-application
+kubectl delete all -l io.kompose.service=mysql
+cd ../../..
+kubectl apply -f 04-currency-exchange-microservice-basic/deployment.yaml 
+kubectl apply -f 05-currency-conversion-microservice-basic/deployment.yaml
+eksctl utils associate-iam-oidc-provider     --region us-east-1     --cluster in28minutes-cluster     --approve
+aws iam create-policy     --policy-name ALBIngressControllerIAMPolicy     --policy-document https://raw.githubusercontent.com/kubernetes-sigs/aws-alb-ingress-controller/v1.1.4/docs/examples/iam-policy.json
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/aws-alb-ingress-controller/v1.1.4/docs/examples/rbac-role.yaml
+eksctl create iamserviceaccount     --region us-east-1     --name alb-ingress-controller     --namespace kube-system     --cluster in28minutes-cluster     --attach-policy-arn arn:aws:iam::825148403966:policy/ALBIngressControllerIAMPolicy     --override-existing-serviceaccounts     --approve
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/aws-alb-ingress-controller/v1.1.4/docs/examples/alb-ingress-controller.yaml
+kubectl edit deployment.apps/alb-ingress-controller -n kube-system
+kubectl get pods -n kube-system
+kubectl apply -f 05-currency-conversion-microservice-basic/ingress_aws.yaml
+curl https://raw.githubusercontent.com/aws-samples/amazon-cloudwatch-container-insights/latest/k8s-deployment-manifest-templates/deployment-mode/daemonset/container-insights-monitoring/quickstart/cwagent-fluentd-quickstart.yaml | sed "s/{{cluster_name}}/in28minutes-cluster/;s/{{region_name}}/us-east-1/" | kubectl apply -f -
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/autoscaler/master/cluster-autoscaler/cloudprovider/aws/examples/cluster-autoscaler-autodiscover.yaml
+kubectl -n kube-system annotate deployment.apps/cluster-autoscaler cluster-autoscaler.kubernetes.io/safe-to-evict="false"
+kubectl -n kube-system edit deployment.apps/cluster-autoscaler
+kubectl version
+kubectl -n kube-system set image deployment.apps/cluster-autoscaler cluster-autoscaler=k8s.gcr.io/cluster-autoscaler:v1.14.7
+kubectl create deployment autoscaler-demo --image=nginx
+kubectl scale deployment autoscaler-demo --replicas=50
+kubectl -n kube-system logs -f deployment.apps/cluster-autoscaler
+kubectl scale deployment autoscaler-demo --replicas=0
+kubectl get svc --all-namespaces
+kubectl delete service currency-conversion
+kubectl delete service currency-exchange
+kubectl delete ingress gateway-ingress
+eksctl delete cluster --name in28minutes-cluster
+
+```
+
+## Azure
+
+```
+az group create --name kubernetes-resource-group --location westeurope
+az ad sp create-for-rbac --skip-assignment --name kubernetes-cluster-service-principal
+az aks create --name in28minutes-cluster --node-count 4 --enable-addons monitoring --resource-group kubernetes-resource-group --vm-set-type VirtualMachineScaleSets --load-balancer-sku standard --enable-cluster-autoscaler  --min-count 1 --max-count 7 --generate-ssh-keys --service-principal HIDDEN --client-secret  HIDDEN
+az aks get-credentials --resource-group kubernetes-resource-group --name in28minutes-cluster
+kubectl version
+kubectl get nodes
+kubectl create deployment hello-world-rest-api --image=in28min/hello-world-rest-api:0.0.1.RELEASE
+kubectl expose deployment hello-world-rest-api --type=LoadBalancer --port=8080
+kubectl create deployment todowebapp-h2 --image=in28min/todo-web-application-h2:0.0.1-SNAPSHOT
+kubectl expose deployment todowebapp-h2 --type=LoadBalancer --port=8080
+git clone https://github.com/in28minutes/kubernetes-crash-course.git
+cd 03-todo-web-application-mysql/backup/02-final-backup-at-end-of-course
+kubectl apply -f mysql-database-data-volume-persistentvolumeclaim.yaml,mysql-deployment.yaml,mysql-service.yaml
+kubectl apply -f config-map.yaml,secret.yaml,todo-web-application-deployment.yaml,todo-web-application-service.yaml
+kubectl delete all -l app=hello-world-rest-api
+kubectl delete all -l app=todowebapp-h2
+kubectl delete all -l io.kompose.service=todo-web-application
+kubectl delete all -l io.kompose.service=mysql
+
+cd ../../..
+kubectl apply -f 04-currency-exchange-microservice-basic/deployment.yaml
+kubectl apply -f 05-currency-conversion-microservice-basic/deployment.yaml
+
+helm repo add stable https://kubernetes-charts.storage.googleapis.com/
+helm install stable/nginx-ingress --namespace default --set controller.replicaCount=1 --set controller.nodeSelector."beta\.kubernetes\.io/os"=linux --set defaultBackend.nodeSelector."beta\.kubernetes\.io/os"=linux --generate-name
+
+kubectl apply -f 05-currency-conversion-microservice-basic/ingress_azure.yaml
+
+kubectl get svc
+kubectl delete svc currency-conversion
+kubectl delete svc currency-exchange
+kubectl delete svc nginx-ingress-1583140351-controller
+
+az aks delete --name in28minutes-cluster --resource-group kubernetes-resource-group
+
+```
+
 ## Notes
 
 - Assume replicas = 200 maxUnavailable = 20% maxSurge = 20%. Max pods that can be unavailable during release = 20%(maxUnavailable) * 200 = 40. Max pods used during release = 200 + 20%(maxSurge) * 200 = 240
